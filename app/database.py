@@ -19,7 +19,7 @@ class ScheduledTaskRecord:
     content: str
     is_one_time: bool
     created_at: str
-    username: str = ""
+    user_id: str = ""
     room_id: str = ""
     last_run_at: str | None = None
     run_count: int = 0
@@ -31,7 +31,7 @@ class ScheduledTaskRecord:
             "cron": self.cron,
             "content": self.content,
             "is_one_time": self.is_one_time,
-            "username": self.username,
+            "user_id": self.user_id,
             "room_id": self.room_id,
             "created_at": self.created_at,
             "last_run_at": self.last_run_at,
@@ -88,7 +88,7 @@ class Database:
                     cron TEXT NOT NULL,
                     content TEXT NOT NULL,
                     is_one_time INTEGER NOT NULL DEFAULT 0,
-                    username TEXT NOT NULL DEFAULT '',
+                    user_id TEXT NOT NULL DEFAULT '',
                     room_id TEXT NOT NULL DEFAULT '',
                     created_at TEXT NOT NULL,
                     last_run_at TEXT,
@@ -100,10 +100,15 @@ class Database:
                 row["name"]
                 for row in self._conn.execute("PRAGMA table_info(scheduled_tasks);").fetchall()
             }
-            if "username" not in existing_cols:
-                self._conn.execute(
-                    "ALTER TABLE scheduled_tasks ADD COLUMN username TEXT NOT NULL DEFAULT '';"
-                )
+            if "user_id" not in existing_cols:
+                if "username" in existing_cols:
+                    self._conn.execute(
+                        "ALTER TABLE scheduled_tasks RENAME COLUMN username TO user_id;"
+                    )
+                else:
+                    self._conn.execute(
+                        "ALTER TABLE scheduled_tasks ADD COLUMN user_id TEXT NOT NULL DEFAULT '';"
+                    )
             if "room_id" not in existing_cols:
                 self._conn.execute(
                     "ALTER TABLE scheduled_tasks ADD COLUMN room_id TEXT NOT NULL DEFAULT '';"
@@ -168,7 +173,7 @@ class Database:
             cron=row["cron"],
             content=row["content"],
             is_one_time=bool(row["is_one_time"]),
-            username=row["username"] or "",
+            user_id=row["user_id"] or "",
             room_id=row["room_id"] or "",
             created_at=row["created_at"],
             last_run_at=row["last_run_at"],
@@ -182,7 +187,7 @@ class Database:
         cron: str,
         content: str,
         is_one_time: bool,
-        username: str = "",
+        user_id: str = "",
         room_id: str = "",
     ) -> ScheduledTaskRecord:
         created_at = _utc_now_iso()
@@ -190,7 +195,7 @@ class Database:
             self._conn.execute(
                 """
                 INSERT INTO scheduled_tasks (
-                    uuid, title, cron, content, is_one_time, username, room_id, created_at
+                    uuid, title, cron, content, is_one_time, user_id, room_id, created_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
                 """,
                 (
@@ -199,7 +204,7 @@ class Database:
                     cron,
                     content,
                     int(is_one_time),
-                    username,
+                    user_id,
                     room_id,
                     created_at,
                 ),
@@ -210,7 +215,7 @@ class Database:
             cron=cron,
             content=content,
             is_one_time=is_one_time,
-            username=username,
+            user_id=user_id,
             room_id=room_id,
             created_at=created_at,
             last_run_at=None,

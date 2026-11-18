@@ -203,19 +203,19 @@ class TestMatrixBotHelpers(unittest.TestCase):
             asyncio.run(bot.deliver_task_result("", "", "hello"))
             self.assertEqual(len(sent_calls), 0)
 
-            # 2. Group room + empty username -> send to group without mention
+            # 2. Group room + empty user_id -> send to group without mention
             asyncio.run(bot.deliver_task_result("!group:example.org", "", "group notice"))
             self.assertEqual(sent_calls[-1]["room_id"], "!group:example.org")
             self.assertIsNone(sent_calls[-1]["mention_user_id"])
             self.assertIsNone(sent_calls[-1]["mention_fallback_name"])
 
-            # 3. Group room + username -> send to group and @mention user
+            # 3. Group room + user_id (or display name resolved to MXID) -> send to group and @mention user
             asyncio.run(bot.deliver_task_result("!group:example.org", "Alice", "hi alice"))
             self.assertEqual(sent_calls[-1]["room_id"], "!group:example.org")
             self.assertEqual(sent_calls[-1]["mention_user_id"], "@alice:example.org")
             self.assertEqual(sent_calls[-1]["mention_label"], "Alice")
 
-            # 4. Empty room_id + username -> create/find encrypted DM and send directly
+            # 4. Empty room_id + user_id -> create/find encrypted DM and send directly
             asyncio.run(bot.deliver_task_result("", "@bob:example.org", "dm bob"))
             self.assertEqual(len(created_dms), 1)
             self.assertEqual(created_dms[0]["invite"], ["@bob:example.org"])
@@ -232,7 +232,7 @@ class TestMatrixBotHelpers(unittest.TestCase):
                 ("!group:example.org", "@alice:example.org"),
             )
             self.assertEqual(
-                bot.validate_task_target("null", "$username"),
+                bot.validate_task_target("null", "$user_id"),
                 ("", ""),
             )
             with self.assertRaises(ValueError):

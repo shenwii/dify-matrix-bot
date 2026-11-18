@@ -50,19 +50,24 @@ class TestSettings(unittest.TestCase):
 
     def test_custom_dify_inputs_json(self) -> None:
         env = {
-            "DIFY_INPUTS": '{"username": "$username", "source": "matrix", "history": "$history"}',
-            "DIFY_SCHEDULER_INPUTS": '{"username": "$username", "room_id": "$room_id"}',
+            "DIFY_INPUTS": '{"user_name": "$user_name", "user_id": "$user_id", "source": "matrix", "history": "$history"}',
+            "DIFY_SCHEDULER_INPUTS": '{"user_id": "$user_id", "room_id": "$room_id"}',
         }
         with patch.dict(os.environ, env, clear=True):
             settings = Settings.from_env()
 
         self.assertEqual(
             settings.dify_inputs_template,
-            {"username": "$username", "source": "matrix", "history": "$history"},
+            {
+                "user_name": "$user_name",
+                "user_id": "$user_id",
+                "source": "matrix",
+                "history": "$history",
+            },
         )
         self.assertEqual(
             settings.dify_scheduler_inputs_template,
-            {"username": "$username", "room_id": "$room_id"},
+            {"user_id": "$user_id", "room_id": "$room_id"},
         )
 
         with patch.dict(os.environ, {"DIFY_INPUTS": "not-json"}, clear=True):

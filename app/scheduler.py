@@ -13,7 +13,12 @@ from apscheduler.triggers.cron import CronTrigger
 
 from app.config import Settings
 from app.database import Database, ScheduledTaskRecord
-from app.dify_client import DifyClient, render_dify_inputs, validate_target_format
+from app.dify_client import (
+    DifyClient,
+    extract_localpart,
+    render_dify_inputs,
+    validate_target_format,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -22,11 +27,11 @@ class MatrixSender(Protocol):
     """Protocol for validating targets and delivering scheduled task results to Matrix."""
 
     def validate_task_target(
-        self, room_id: str, username: str
+        self, room_id: str, user_id: str
     ) -> tuple[str, str]: ...
 
     async def deliver_task_result(
-        self, room_id: str, username: str, text: str
+        self, room_id: str, user_id: str, text: str
     ) -> None: ...
 
 
@@ -120,7 +125,7 @@ class TaskScheduler:
         cron: str,
         content: str,
         is_one_time: bool = False,
-        username: str = "",
+        user_id: str = "",
         room_id: str = "",
     ) -> dict:
         """Validate cron, persist a new task, and schedule it."""
@@ -132,10 +137,10 @@ class TaskScheduler:
         if not clean_content:
             raise ValueError("content cannot be empty")
 
-        clean_room_id, clean_username = validate_target_format(room_id, username)
+        clean_room_id, clean_user_id = validate_target_format(room_id, user_id)
         validator = getattr(self._matrix_sender, "validate_task_target", None)
         if callable(validator):
-            clean_room_id, clean_username = validator(clean_room_id, clean_username)
+            clean_room_id, clean_user_id = validator(clean_room_id, clean_user_id)
 
         # Validate cron before touching the database.
         self._build_trigger(clean_cron)
@@ -147,7 +152,7 @@ class TaskScheduler:
             cron=clean_cron,
             content=clean_content,
             is_one_time=bool(is_one_time),
-            username=clean_username,
+            user_id=clean_user_id,
             room_id=clean_room_id,
         )
         self._register_job(task)
@@ -155,12 +160,12 @@ class TaskScheduler:
         result = task.to_dict()
         result["next_run_time"] = self._get_next_run_iso(task.uuid)
         logger.info(
-            "Scheduled task created: uuid=%s title=%r cron=%r is_one_time=%s username=%r room_id=%r",
+            "Scheduled task created: uuid=%s title=%r cron=%r is_one_time=%s user_id=%r room_id=%r",
             task.uuid,
             task.title,
             task.cron,
             task.is_one_time,
-            task.username,
+            task.user_id,
             task.room_id,
         )
         return result
@@ -199,32 +204,35 @@ class TaskScheduler:
             return
 
         logger.info("Executing scheduled task %s (%s)", task.uuid, task.title)
-        should_notify = bool(task.room_id or task.username)
+        should_notify = bool(task.room_id or task.user_id)
 
         try:
             prompt = build_scheduled_prompt(task)
             dify_inputs = render_dify_inputs(
                 template=self._settings.dify_scheduler_inputs_template,
                 context={
-                    "username": task.username,
+                    "user_id": task.user_id,
+                    "user_localpart": extract_localpart(task.user_id) if task.user_id else "",
                     "room_id": task.room_id,
+                    "task_uuid": task.uuid,
+                    "task_title": task.title,
                 },
             )
             dify_res = await self._dify.chat(
                 query=prompt,
-                user=task.username or self._settings.dify_scheduled_user,
+                user=task.user_id or self._settings.dify_scheduled_user,
                 inputs=dify_inputs,
             )
             if should_notify:
                 message = format_scheduled_result(task, dify_res.answer)
                 await self._matrix_sender.deliver_task_result(
                     room_id=task.room_id,
-                    username=task.username,
+                    user_id=task.user_id,
                     text=message,
                 )
             else:
                 logger.info(
-                    "Task %s executed silently (both username and room_id are empty)",
+                    "Task %s executed silently (both user_id and room_id are empty)",
                     task.uuid,
                 )
         except Exception as exc:
@@ -233,7 +241,7 @@ class TaskScheduler:
                 try:
                     await self._matrix_sender.deliver_task_result(
                         room_id=task.room_id,
-                        username=task.username,
+                        user_id=task.user_id,
                         text=f"**[定时任务失败] {task.title}**\n\n执行出错: `{exc}`",
                     )
                 except Exception:

@@ -11,14 +11,14 @@ A lightweight, single-container service built with `matrix-nio`, `FastAPI`, `APS
 1. **Dify Scheduled Task MCP Server (SSE)**
    - Exposes an MCP SSE endpoint at `/sse` (and `/messages/`) on the FastAPI server for Dify to connect.
    - Provides 3 MCP tools:
-     - `create_scheduled_task`: Create a scheduled task with auto-generated `uuid`, `title`, `cron`, `content`, `is_one_time`, plus optional `username` and `room_id`.
+     - `create_scheduled_task`: Create a scheduled task with auto-generated `uuid`, `title`, `cron`, `content`, `is_one_time`, plus optional `user_id` and `room_id`.
      - `list_scheduled_tasks`: List all scheduled tasks and their next run times.
      - `delete_scheduled_task`: Delete a scheduled task by `task_uuid`.
-   - When a cron trigger fires, the scheduler invokes Dify `/chat-messages` with `DIFY_SCHEDULER_INPUTS` and routes the response based on `username` and `room_id`:
-     - `room_id` empty & `username` empty → Executes silently (no Matrix message sent).
-     - `room_id` empty & `username` non-empty → Sends a Direct Message (DM) to `username`.
-     - `room_id` non-empty & `username` empty → Sends to the group room without `@mentioning` anyone.
-     - `room_id` non-empty & `username` non-empty → Sends to the group room and `@mentions` `username`.
+   - When a cron trigger fires, the scheduler invokes Dify `/chat-messages` with `DIFY_SCHEDULER_INPUTS` and routes the response based on `user_id` and `room_id`:
+     - `room_id` empty & `user_id` empty → Executes silently (no Matrix message sent).
+     - `room_id` empty & `user_id` non-empty → Sends a Direct Message (DM) to `user_id`.
+     - `room_id` non-empty & `user_id` empty → Sends to the group room without `@mentioning` anyone.
+     - `room_id` non-empty & `user_id` non-empty → Sends to the group room and `@mentions` `user_id`.
    - One-time tasks (`is_one_time=true`) are automatically removed after execution. All tasks are persisted in SQLite and restored across restarts.
 
 2. **Matrix AI Bot (`matrix-nio`)**
@@ -55,16 +55,16 @@ A lightweight, single-container service built with `matrix-nio`, `FastAPI`, `APS
 
 ### 1. Chat Bot Inputs (`DIFY_INPUTS`)
 
-Configure `DIFY_INPUTS` as a single-line JSON object using `$var` or `${var}` placeholders and static values.
+Configure `DIFY_INPUTS` as a single-line JSON object using `$var` or `${var}` placeholders and static values. You can customize the JSON keys to match whatever input names your Dify app expects:
 
 ```env
-DIFY_INPUTS={"username":"$user_id","room_id":"$room_id","source":"matrix","history":"$history"}
+DIFY_INPUTS={"user_id":"$user_id","user_name":"$user_name","room_id":"$room_id","source":"matrix","history":"$history"}
 ```
 
 | Variable | Description |
 | :--- | :--- |
-| `$username` / `$user_name` | Sender display name in Matrix |
 | `$user_id` | Sender Matrix MXID (e.g. `@alice:example.org`) |
+| `$user_name` | Sender display name in Matrix |
 | `$user_localpart` | Matrix username localpart (e.g. `alice`) |
 | `$room_id` | Current Matrix room ID |
 | `$room_name` | Current Matrix room name |
@@ -74,16 +74,16 @@ DIFY_INPUTS={"username":"$user_id","room_id":"$room_id","source":"matrix","histo
 
 ### 2. Scheduler Inputs (`DIFY_SCHEDULER_INPUTS`)
 
-When a scheduled task triggers, less context is available than in live chat, so a dedicated template `DIFY_SCHEDULER_INPUTS` is used with only `$username` and `$room_id` (supplied by Dify when creating the task via MCP):
+When a scheduled task triggers, less context is available than in live chat, so a dedicated template `DIFY_SCHEDULER_INPUTS` is used with `$user_id`, `$user_localpart`, `$room_id`, `$task_uuid`, and `$task_title`:
 
 ```env
-DIFY_SCHEDULER_INPUTS={"username":"$username","room_id":"$room_id"}
+DIFY_SCHEDULER_INPUTS={"user_id":"$user_id","room_id":"$room_id"}
 ```
 
 If either `DIFY_INPUTS` or `DIFY_SCHEDULER_INPUTS` is omitted or empty, `{}` is sent as `inputs`.
 
 > [!TIP]
-> If you want DM delivery when `room_id` is empty, prefer passing `$user_id` (e.g. `@alice:example.org`) as `username` in `DIFY_INPUTS` so Dify passes an unambiguous Matrix ID to `create_scheduled_task`.
+> Across this project, `user_id` always refers to the Matrix MXID (e.g. `@alice:example.org`) and `user_name` refers to the display name. Passing `$user_id` to Dify ensures Dify passes an unambiguous Matrix ID to `create_scheduled_task` for reliable DM and `@mention` delivery.
 
 ---
 
@@ -119,7 +119,7 @@ Add an MCP Server in Dify with:
 | `DIFY_BASE_URL` | No | `https://api.dify.ai/v1` | Dify API base URL |
 | `DIFY_API_KEY` | Yes | - | Dify App API key |
 | `DIFY_TIMEOUT_SECONDS` | No | `180` | Dify HTTP streaming timeout |
-| `DIFY_SCHEDULED_USER` | No | `dify-scheduler` | Fallback `user` field passed to Dify when task `username` is empty |
+| `DIFY_SCHEDULED_USER` | No | `dify-scheduler` | Fallback `user` field passed to Dify when task `user_id` is empty |
 | `DIFY_INPUTS` | No | `{}` | JSON template for Dify `inputs` during Matrix chat |
 | `DIFY_SCHEDULER_INPUTS` | No | `{}` | JSON template for Dify `inputs` during scheduled task runs |
 | `TZ` | No | `Asia/Shanghai` | Standard system & cron scheduler timezone |

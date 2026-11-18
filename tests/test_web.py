@@ -24,10 +24,10 @@ from app.web import CreateTaskRequest, create_web_router
 
 
 class _DummySender:
-    def validate_task_target(self, room_id: str, username: str) -> tuple[str, str]:
-        return room_id, username
+    def validate_task_target(self, room_id: str, user_id: str) -> tuple[str, str]:
+        return room_id, user_id
 
-    async def deliver_task_result(self, room_id: str, username: str, text: str) -> None:
+    async def deliver_task_result(self, room_id: str, user_id: str, text: str) -> None:
         pass
 
 
@@ -96,12 +96,13 @@ class TestWebRouter(unittest.TestCase):
                     cron="0 10 * * *",
                     content="Post standup reminder",
                     is_one_time=False,
-                    username="@alice:example.org",
+                    user_id="@alice:example.org",
                     room_id="!room:example.org",
                 )
             )
         )
         task_uuid = created["task"]["uuid"]
+        self.assertEqual(created["task"]["user_id"], "@alice:example.org")
         self.assertEqual(asyncio.run(list_fn())["count"], 1)
 
         with self.assertRaises(HTTPException) as bad_cron:
@@ -112,7 +113,7 @@ class TestWebRouter(unittest.TestCase):
                         cron="bad cron",
                         content="x",
                         is_one_time=False,
-                        username="",
+                        user_id="",
                         room_id="",
                     )
                 )
@@ -127,7 +128,7 @@ class TestWebRouter(unittest.TestCase):
                         cron="0 10 * * *",
                         content="x",
                         is_one_time=False,
-                        username="",
+                        user_id="",
                         room_id="not_a_room",
                     )
                 )

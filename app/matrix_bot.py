@@ -535,7 +535,6 @@ class MatrixBot:
             dify_inputs = render_dify_inputs(
                 template=self._settings.dify_inputs_template,
                 context={
-                    "username": sender_name,
                     "user_name": sender_name,
                     "user_id": sender_id,
                     "user_localpart": extract_localpart(sender_id),
@@ -659,9 +658,9 @@ class MatrixBot:
         return None
 
     def _resolve_user_in_room(
-        self, room: MatrixRoom | None, username: str
+        self, room: MatrixRoom | None, user_id: str
     ) -> tuple[str | None, str | None]:
-        clean = username.strip()
+        clean = user_id.strip()
         if not clean:
             return None, None
         if clean.startswith("@") and ":" in clean:
@@ -676,8 +675,8 @@ class MatrixBot:
                     return mxid, display or extract_localpart(mxid)
         return None, None
 
-    def _find_user_across_rooms(self, username: str) -> str | None:
-        clean = username.strip()
+    def _find_user_across_rooms(self, user_id: str) -> str | None:
+        clean = user_id.strip()
         if not clean:
             return None
         for room in self._client.rooms.values():
@@ -692,10 +691,10 @@ class MatrixBot:
         return None
 
     def validate_task_target(
-        self, room_id: str, username: str
+        self, room_id: str, user_id: str
     ) -> tuple[str, str]:
-        """Validate and canonicalize task target (room_id, username) against known Matrix state."""
-        clean_room, clean_user = validate_target_format(room_id, username)
+        """Validate and canonicalize task target (room_id, user_id) against known Matrix state."""
+        clean_room, clean_user = validate_target_format(room_id, user_id)
         if not self._connected:
             return clean_room, clean_user
 
@@ -725,13 +724,13 @@ class MatrixBot:
                 clean_user = resolved
             elif not MATRIX_MXID_RE.match(clean_user) or self._client.rooms:
                 raise ValueError(
-                    f"Unknown username {clean_user!r}: user not found in any room the bot has joined."
+                    f"Unknown user_id {clean_user!r}: user not found in any room the bot has joined."
                 )
 
         return clean_room, clean_user
 
-    def _resolve_dm_target_mxid(self, username: str) -> str | None:
-        clean = normalize_target_field(username)
+    def _resolve_dm_target_mxid(self, user_id: str) -> str | None:
+        clean = normalize_target_field(user_id)
         if not clean:
             return None
         if MATRIX_MXID_RE.match(clean):
@@ -778,11 +777,11 @@ class MatrixBot:
         return None
 
     async def deliver_task_result(
-        self, room_id: str, username: str, text: str
+        self, room_id: str, user_id: str, text: str
     ) -> None:
         """Route scheduled task output to a group (with optional @mention) or DM."""
         clean_room = normalize_target_field(room_id)
-        clean_user = normalize_target_field(username)
+        clean_user = normalize_target_field(user_id)
 
         if not clean_room and not clean_user:
             return
@@ -813,7 +812,7 @@ class MatrixBot:
         target_mxid = self._resolve_dm_target_mxid(clean_user)
         if not target_mxid or not MATRIX_MXID_RE.match(target_mxid):
             logger.warning(
-                "Could not resolve valid Matrix user ID for DM delivery (username=%r)",
+                "Could not resolve valid Matrix user ID for DM delivery (user_id=%r)",
                 clean_user,
             )
             return

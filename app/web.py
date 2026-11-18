@@ -18,7 +18,7 @@ class CreateTaskRequest(BaseModel):
     cron: str = Field(..., min_length=1, max_length=100)
     content: str = Field(..., min_length=1, max_length=10000)
     is_one_time: bool = False
-    username: str = Field(default="", max_length=255)
+    user_id: str = Field(default="", max_length=255)
     room_id: str = Field(default="", max_length=255)
 
 
@@ -151,11 +151,11 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
         <div>
           <label for="room_id">目标 Room ID（可选）</label>
           <input id="room_id" name="room_id" type="text" placeholder="!roomid:example.org" />
-          <div class="hint">为空且填了用户名时将私信发送</div>
+          <div class="hint">为空且填了 User ID 时将私信发送</div>
         </div>
         <div>
-          <label for="username">目标用户 Username / MXID（可选）</label>
-          <input id="username" name="username" type="text" placeholder="@alice:example.org" />
+          <label for="user_id">目标用户 User ID（可选）</label>
+          <input id="user_id" name="user_id" type="text" placeholder="@alice:example.org" />
           <div class="hint">与 Room ID 均为空时仅静默执行</div>
         </div>
         <div class="full">
@@ -242,8 +242,8 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
       if (payload.room_id && !/^![^:\\s]+:[^\\s]+$/.test(payload.room_id)) {
         return "Room ID 格式无效，应类似 !roomid:server（或留空）。";
       }
-      if (payload.username && payload.username.startsWith("@") && payload.username.includes(":") && !/^@[^:\\s]+:[^\\s]+$/.test(payload.username)) {
-        return "MXID 格式无效，应类似 @user:server。";
+      if (payload.user_id && payload.user_id.startsWith("@") && payload.user_id.includes(":") && !/^@[^:\\s]+:[^\\s]+$/.test(payload.user_id)) {
+        return "User ID (MXID) 格式无效，应类似 @user:server。";
       }
       return null;
     }
@@ -272,9 +272,9 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
           return;
         }
         taskBody.innerHTML = tasks.map((t) => {
-          const target = (!t.room_id && !t.username)
+          const target = (!t.room_id && !t.user_id)
             ? '<span class="hint">静默执行</span>'
-            : `${t.room_id ? "<div>Room: <code>" + esc(t.room_id) + "</code></div>" : ""}${t.username ? "<div>User: <code>" + esc(t.username) + "</code></div>" : ""}`;
+            : `${t.room_id ? "<div>Room: <code>" + esc(t.room_id) + "</code></div>" : ""}${t.user_id ? "<div>User ID: <code>" + esc(t.user_id) + "</code></div>" : ""}`;
           return `
             <tr>
               <td><strong>${esc(t.title)}</strong><div class="hint" style="white-space:pre-wrap;">${esc(t.content)}</div></td>
@@ -304,7 +304,7 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
         content: document.getElementById("content").value.trim(),
         is_one_time: document.getElementById("is_one_time").checked,
         room_id: document.getElementById("room_id").value.trim(),
-        username: document.getElementById("username").value.trim(),
+        user_id: document.getElementById("user_id").value.trim(),
       };
       const clientErr = validateClient(payload);
       if (clientErr) {
@@ -390,7 +390,7 @@ def create_web_router(get_scheduler: Callable[[], TaskScheduler]) -> APIRouter:
                 cron=payload.cron,
                 content=payload.content,
                 is_one_time=payload.is_one_time,
-                username=payload.username,
+                user_id=payload.user_id,
                 room_id=payload.room_id,
             )
         except ValueError as exc:

@@ -11,14 +11,14 @@
 1. **Dify スケジュールタスク MCP サーバー（SSE）**
    - FastAPI サーバー上で `/sse`（および `/messages/`）を公開し、Dify から SSE MCP として接続できます。
    - 3 つの MCP ツールを提供：
-     - `create_scheduled_task`：定期/単発タスクを作成（`uuid` は自動生成。`title`、`cron`、`content`、`is_one_time`、および任意の `username`・`room_id` を指定）。
+     - `create_scheduled_task`：定期/単発タスクを作成（`uuid` は自動生成。`title`、`cron`、`content`、`is_one_time`、および任意の `user_id`・`room_id` を指定）。
      - `list_scheduled_tasks`：登録済みタスク一覧と次回実行時刻を取得。
      - `delete_scheduled_task`：`task_uuid` を指定してタスクを削除。
-   - Cron 実行時刻になると `DIFY_SCHEDULER_INPUTS` を用いて Dify `/chat-messages` を呼び出し、`username` と `room_id` に応じて通知先を制御します：
-     - `room_id` が空かつ `username` が空 → サイレント実行（Matrix へ通知しません）。
-     - `room_id` が空かつ `username` が非空 → 該当ユーザーへ DM（ダイレクトメッセージ）送信。
-     - `room_id` が非空かつ `username` が空 → グループルームへメンションなしで送信。
-     - `room_id` が非空かつ `username` が非空 → グループルームへ `username` を `@メンション` して送信。
+   - Cron 実行時刻になると `DIFY_SCHEDULER_INPUTS` を用いて Dify `/chat-messages` を呼び出し、`user_id` と `room_id` に応じて通知先を制御します：
+     - `room_id` が空かつ `user_id` が空 → サイレント実行（Matrix へ通知しません）。
+     - `room_id` が空かつ `user_id` が非空 → 該当ユーザーへ DM（ダイレクトメッセージ）送信。
+     - `room_id` が非空かつ `user_id` が空 → グループルームへメンションなしで送信。
+     - `room_id` が非空かつ `user_id` が非空 → グループルームへ `user_id` を `@メンション` して送信。
    - 単発タスク（`is_one_time=true`）は実行後に自動削除されます。タスクは SQLite に永続化され、再起動後も自動復元されます。
 
 2. **Matrix AI ボット（`matrix-nio`）**
@@ -55,16 +55,16 @@
 
 ### 1. チャットボット用 Inputs（`DIFY_INPUTS`）
 
-`.env` の `DIFY_INPUTS` に 1 行の JSON テンプレートを設定します。`$var` / `${var}` プレースホルダーと固定値を混在させることができます：
+`.env` の `DIFY_INPUTS` に 1 行の JSON テンプレートを設定します。`$var` / `${var}` プレースホルダーと固定値を混在させることができます（JSON のキー名は Dify アプリの入力変数名に合わせて自由に指定可能です）：
 
 ```env
-DIFY_INPUTS={"username":"$user_id","room_id":"$room_id","source":"matrix","history":"$history"}
+DIFY_INPUTS={"user_id":"$user_id","user_name":"$user_name","room_id":"$room_id","source":"matrix","history":"$history"}
 ```
 
 | 変数名 | 説明 |
 | :--- | :--- |
-| `$username` / `$user_name` | Matrix 送信者の表示名 |
 | `$user_id` | 送信者の Matrix MXID（例：`@alice:example.org`） |
+| `$user_name` | Matrix 送信者の表示名 |
 | `$user_localpart` | Matrix ユーザー名のローカルパート（例：`alice`） |
 | `$room_id` | 現在のルーム ID |
 | `$room_name` | 現在のルーム名 |
@@ -74,16 +74,16 @@ DIFY_INPUTS={"username":"$user_id","room_id":"$room_id","source":"matrix","histo
 
 ### 2. スケジューラー用 Inputs（`DIFY_SCHEDULER_INPUTS`）
 
-スケジュール実行時は通常チャットより取得できるコンテキストが少ないため、専用の `DIFY_SCHEDULER_INPUTS` を使用し、MCP 経由で Dify から渡された `$username` と `$room_id` のみを参照します：
+スケジュール実行時は通常チャットより取得できるコンテキストが少ないため、専用の `DIFY_SCHEDULER_INPUTS` を使用し、`$user_id`、`$user_localpart`、`$room_id`、`$task_uuid`、`$task_title` を参照できます：
 
 ```env
-DIFY_SCHEDULER_INPUTS={"username":"$username","room_id":"$room_id"}
+DIFY_SCHEDULER_INPUTS={"user_id":"$user_id","room_id":"$room_id"}
 ```
 
 `DIFY_INPUTS` や `DIFY_SCHEDULER_INPUTS` が未設定の場合は `{}` が送信されます。
 
 > [!TIP]
-> `room_id` が空のときに DM 送信を確実に行うため、`DIFY_INPUTS` では `$user_id`（例：`@alice:example.org`）を `username` として Dify へ渡すことを推奨します。
+> 本プロジェクト内では、`user_id` が常に Matrix MXID（例：`@alice:example.org`）、`user_name` が表示名を指します。`DIFY_INPUTS` で `$user_id` を渡すことで、Dify が `create_scheduled_task` に明確な `user_id` を指定して確実な DM / `@メンション` 送信を行えます。
 
 ---
 
@@ -119,7 +119,7 @@ Dify の MCP 設定で SSE サーバーを追加します：
 | `DIFY_BASE_URL` | いいえ | `https://api.dify.ai/v1` | Dify API ベース URL |
 | `DIFY_API_KEY` | はい | - | Dify アプリの API キー |
 | `DIFY_TIMEOUT_SECONDS` | いいえ | `180` | Dify ストリーミング API タイムアウト（秒） |
-| `DIFY_SCHEDULED_USER` | いいえ | `dify-scheduler` | タスクの `username` が空の場合に使うフォールバック `user` 識別子 |
+| `DIFY_SCHEDULED_USER` | いいえ | `dify-scheduler` | タスクの `user_id` が空の場合に使うフォールバック `user` 識別子 |
 | `DIFY_INPUTS` | いいえ | `{}` | Matrix チャット時の Dify `inputs` 用 JSON テンプレート |
 | `DIFY_SCHEDULER_INPUTS` | いいえ | `{}` | スケジュール実行時の Dify `inputs` 用 JSON テンプレート |
 | `TZ` | いいえ | `Asia/Shanghai` | システムおよび Cron スケジューラーのタイムゾーン |

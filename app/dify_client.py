@@ -130,16 +130,18 @@ _TARGET_PLACEHOLDERS = {
     "无",
     "空",
     "$username",
+    "$user_name",
     "$user_id",
     "$room_id",
     "{username}",
+    "{user_name}",
     "{user_id}",
     "{room_id}",
 }
 
 
 def normalize_target_field(value: str | None) -> str:
-    """Normalize optional username/room_id, treating LLM placeholders as empty."""
+    """Normalize optional user_id/room_id, treating LLM placeholders as empty."""
     if value is None:
         return ""
     cleaned = str(value).strip()
@@ -148,10 +150,10 @@ def normalize_target_field(value: str | None) -> str:
     return cleaned
 
 
-def validate_target_format(room_id: str, username: str) -> tuple[str, str]:
-    """Normalize and validate basic Matrix room_id and username formats."""
+def validate_target_format(room_id: str, user_id: str) -> tuple[str, str]:
+    """Normalize and validate basic Matrix room_id and user_id formats."""
     clean_room = normalize_target_field(room_id)
-    clean_user = normalize_target_field(username)
+    clean_user = normalize_target_field(user_id)
 
     if clean_room and not MATRIX_ROOM_ID_RE.match(clean_room):
         raise ValueError(
@@ -162,10 +164,10 @@ def validate_target_format(room_id: str, username: str) -> tuple[str, str]:
         if clean_user.startswith("@") and ":" in clean_user:
             if not MATRIX_MXID_RE.match(clean_user):
                 raise ValueError(
-                    f"Invalid username MXID {clean_user!r}: expected format '@user:server'."
+                    f"Invalid user_id MXID {clean_user!r}: expected format '@user:server'."
                 )
         elif clean_user.startswith("@") and any(ch.isspace() for ch in clean_user):
-            raise ValueError(f"Invalid username {clean_user!r}: contains whitespace.")
+            raise ValueError(f"Invalid user_id {clean_user!r}: contains whitespace.")
 
     return clean_room, clean_user
 

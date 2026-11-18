@@ -40,7 +40,7 @@ class TestDifyClientParsing(unittest.TestCase):
 
     def test_render_dify_inputs_template(self) -> None:
         ctx = {
-            "username": "Alice",
+            "user_name": "Alice",
             "user_id": "@alice:example.org",
             "user_localpart": extract_localpart("@alice:example.org"),
             "room_id": "!room:example.org",
@@ -48,8 +48,8 @@ class TestDifyClientParsing(unittest.TestCase):
             "history": "Bob (@bob:example.org): hi",
         }
         template = {
-            "username": "$username",
-            "sender": "${username} ($user_id)",
+            "user_name": "$user_name",
+            "sender": "${user_name} ($user_id)",
             "source": "matrix",
             "history": "$history",
             "static_num": 42,
@@ -59,7 +59,7 @@ class TestDifyClientParsing(unittest.TestCase):
         self.assertEqual(
             rendered,
             {
-                "username": "Alice",
+                "user_name": "Alice",
                 "sender": "Alice (@alice:example.org)",
                 "source": "matrix",
                 "history": "Bob (@bob:example.org): hi",

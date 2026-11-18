@@ -11,14 +11,14 @@
 1. **Dify 定时任务 MCP Server（SSE）**
    - 在 FastAPI 服务上暴露 `/sse`（及 `/messages/`）端点，供 Dify 通过 SSE MCP 接入。
    - 提供 3 个 MCP 工具：
-     - `create_scheduled_task`：新增定时任务（自动生成 `uuid`，参数：`title`、`cron`、`content`、`is_one_time`，以及可选 `username`、`room_id`）。
+     - `create_scheduled_task`：新增定时任务（自动生成 `uuid`，参数：`title`、`cron`、`content`、`is_one_time`，以及可选 `user_id`、`room_id`）。
      - `list_scheduled_tasks`：查询所有定时任务及其下次执行时间。
      - `delete_scheduled_task`：根据 `task_uuid` 删除定时任务。
-   - 到达 Cron 时间后使用 `DIFY_SCHEDULER_INPUTS` 回调 Dify `/chat-messages` 执行任务，并根据任务保存的 `username` 与 `room_id` 决定如何发送结果：
-     - `room_id` 为空且 `username` 为空 → 静默执行，不向 Matrix 发送任何反馈。
-     - `room_id` 为空且 `username` 非空 → 私信发送给该用户。
-     - `room_id` 非空且 `username` 为空 → 发送到群房间，不 `@` 任何人。
-     - `room_id` 非空且 `username` 非空 → 发送到群房间，并 `@` 该用户。
+   - 到达 Cron 时间后使用 `DIFY_SCHEDULER_INPUTS` 回调 Dify `/chat-messages` 执行任务，并根据任务保存的 `user_id` 与 `room_id` 决定如何发送结果：
+     - `room_id` 为空且 `user_id` 为空 → 静默执行，不向 Matrix 发送任何反馈。
+     - `room_id` 为空且 `user_id` 非空 → 私信发送给该用户。
+     - `room_id` 非空且 `user_id` 为空 → 发送到群房间，不 `@` 任何人。
+     - `room_id` 非空且 `user_id` 非空 → 发送到群房间，并 `@` 该用户。
    - 一次性任务（`is_one_time=true`）执行后自动删除；任务持久化在 SQLite 中，重启自动恢复。
 
 2. **Matrix AI 聊天机器人（`matrix-nio`）**
@@ -55,16 +55,16 @@
 
 ### 1. 聊天机器人 Inputs（`DIFY_INPUTS`）
 
-在 `.env` 中通过单行 JSON 模板配置 `DIFY_INPUTS`，支持 `$var` / `${var}` 占位符与静态字符串混用：
+在 `.env` 中通过单行 JSON 模板配置 `DIFY_INPUTS`，支持 `$var` / `${var}` 占位符与静态字符串混用（JSON 的键名可按你的 Dify 应用输入变量名自由定义）：
 
 ```env
-DIFY_INPUTS={"username":"$user_id","room_id":"$room_id","source":"matrix","history":"$history"}
+DIFY_INPUTS={"user_id":"$user_id","user_name":"$user_name","room_id":"$room_id","source":"matrix","history":"$history"}
 ```
 
 | 变量名 | 说明 |
 | :--- | :--- |
-| `$username` / `$user_name` | Matrix 发送者显示昵称 |
 | `$user_id` | Matrix 发送者 MXID（如 `@alice:example.org`） |
+| `$user_name` | Matrix 发送者显示昵称 |
 | `$user_localpart` | Matrix 用户名部分（如 `alice`） |
 | `$room_id` | 当前房间 ID |
 | `$room_name` | 当前房间名称 |
@@ -74,16 +74,16 @@ DIFY_INPUTS={"username":"$user_id","room_id":"$room_id","source":"matrix","histo
 
 ### 2. 定时任务触发时的 Inputs（`DIFY_SCHEDULER_INPUTS`）
 
-定时任务触发时可用上下文比实时聊天少，因此使用独立的 `DIFY_SCHEDULER_INPUTS`，仅保留由 Dify 通过 MCP 传入的 `$username` 和 `$room_id`：
+定时任务触发时可用上下文比实时聊天少，因此使用独立的 `DIFY_SCHEDULER_INPUTS`，可用变量包括 `$user_id`、`$user_localpart`、`$room_id`、`$task_uuid` 和 `$task_title`：
 
 ```env
-DIFY_SCHEDULER_INPUTS={"username":"$username","room_id":"$room_id"}
+DIFY_SCHEDULER_INPUTS={"user_id":"$user_id","room_id":"$room_id"}
 ```
 
 如果未配置 `DIFY_INPUTS` 或 `DIFY_SCHEDULER_INPUTS`，则默认传 `{}`。
 
 > [!TIP]
-> 当 `room_id` 为空需要私信发送时，建议在 `DIFY_INPUTS` 中将 `$user_id`（如 `@alice:example.org`）作为 `username` 传给 Dify，这样 Dify 调用 `create_scheduled_task` 时可精准定位用户。
+> 本项目内统一使用 `user_id` 表示 Matrix MXID（如 `@alice:example.org`），`user_name` 表示用户显示昵称。将 `$user_id` 传给 Dify 后，Dify 调用 `create_scheduled_task` 时即可直接传入精确的 `user_id` 用于私信或群内 `@` 提及。
 
 ---
 
@@ -119,7 +119,7 @@ DIFY_SCHEDULER_INPUTS={"username":"$username","room_id":"$room_id"}
 | `DIFY_BASE_URL` | 否 | `https://api.dify.ai/v1` | Dify API 基础地址 |
 | `DIFY_API_KEY` | 是 | - | Dify 应用 API Key |
 | `DIFY_TIMEOUT_SECONDS` | 否 | `180` | Dify 流式请求超时时间（秒） |
-| `DIFY_SCHEDULED_USER` | 否 | `dify-scheduler` | 任务未传 `username` 时调用 Dify 使用的默认 `user` 标识 |
+| `DIFY_SCHEDULED_USER` | 否 | `dify-scheduler` | 任务未传 `user_id` 时调用 Dify 使用的默认 `user` 标识 |
 | `DIFY_INPUTS` | 否 | `{}` | Matrix 聊天时传给 Dify `inputs` 的 JSON 模板 |
 | `DIFY_SCHEDULER_INPUTS` | 否 | `{}` | 定时任务触发时传给 Dify `inputs` 的 JSON 模板 |
 | `TZ` | 否 | `Asia/Shanghai` | 系统及 Cron 调度器标准时区 |

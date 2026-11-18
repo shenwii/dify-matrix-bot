@@ -30,9 +30,9 @@ class _FakeMatrixSender:
         self.sent: list[tuple[str, str, str]] = []
 
     async def deliver_task_result(
-        self, room_id: str, username: str, text: str
+        self, room_id: str, user_id: str, text: str
     ) -> None:
-        self.sent.append((room_id, username, text))
+        self.sent.append((room_id, user_id, text))
 
 
 class TestTaskScheduler(unittest.TestCase):
@@ -60,7 +60,7 @@ class TestTaskScheduler(unittest.TestCase):
             log_level="INFO",
             mcp_auth_token="",
             dify_scheduler_inputs_template={
-                "username": "$username",
+                "user_id": "$user_id",
                 "room_id": "$room_id",
             },
         )
@@ -98,7 +98,7 @@ class TestTaskScheduler(unittest.TestCase):
             cron="30 14 * * *",
             content="Remind team about release",
             is_one_time=True,
-            username="@alice:example.org",
+            user_id="@alice:example.org",
             room_id="!target:example.org",
         )
         asyncio.run(self.scheduler._execute_task(created["uuid"]))
@@ -107,7 +107,7 @@ class TestTaskScheduler(unittest.TestCase):
         self.assertIn("Remind team about release", self.dify.calls[0]["query"])
         self.assertEqual(
             self.dify.calls[0]["inputs"],
-            {"username": "@alice:example.org", "room_id": "!target:example.org"},
+            {"user_id": "@alice:example.org", "room_id": "!target:example.org"},
         )
         self.assertEqual(len(self.matrix.sent), 1)
         self.assertEqual(self.matrix.sent[0][0], "!target:example.org")
@@ -116,7 +116,7 @@ class TestTaskScheduler(unittest.TestCase):
         self.assertIn("Task executed OK", self.matrix.sent[0][2])
         self.assertEqual(self.scheduler.list_tasks(), [])
 
-    def test_silent_task_when_username_and_room_id_empty(self) -> None:
+    def test_silent_task_when_user_id_and_room_id_empty(self) -> None:
         created = self.scheduler.create_task(
             title="Silent Job",
             cron="0 3 * * *",
@@ -128,7 +128,7 @@ class TestTaskScheduler(unittest.TestCase):
         self.assertEqual(len(self.dify.calls), 1)
         self.assertEqual(
             self.dify.calls[0]["inputs"],
-            {"username": "", "room_id": ""},
+            {"user_id": "", "room_id": ""},
         )
         self.assertEqual(len(self.matrix.sent), 0)
         self.assertEqual(self.scheduler.list_tasks(), [])
@@ -139,10 +139,10 @@ class TestTaskScheduler(unittest.TestCase):
             title="Normalized",
             cron="0 8 * * *",
             content="Check status",
-            username="$username",
+            user_id="$user_id",
             room_id="null",
         )
-        self.assertEqual(created["username"], "")
+        self.assertEqual(created["user_id"], "")
         self.assertEqual(created["room_id"], "")
 
         # Hallucinated room_id format is rejected at creation time
@@ -160,7 +160,7 @@ class TestTaskScheduler(unittest.TestCase):
                 title="Bad User",
                 cron="0 8 * * *",
                 content="Check status",
-                username="@alice user:example.org",
+                user_id="@alice user:example.org",
             )
 
 
