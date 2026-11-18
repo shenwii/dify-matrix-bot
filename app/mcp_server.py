@@ -2,16 +2,52 @@
 
 from __future__ import annotations
 
-from typing import Callable
+import inspect
+from typing import Any, Callable, Sequence
 
 from mcp.server.fastmcp import FastMCP
 
 from app.scheduler import TaskScheduler
 
 
-def create_mcp_server(get_scheduler: Callable[[], TaskScheduler]) -> FastMCP:
+def _build_fastmcp_kwargs(
+    host: str = "0.0.0.0",
+    allowed_hosts: Sequence[str] = (),
+) -> dict[str, Any]:
+    """Build FastMCP kwargs compatible across mcp SDK versions without blocking LAN/Docker hosts."""
+    kwargs: dict[str, Any] = {}
+    params = inspect.signature(FastMCP.__init__).parameters
+    if "host" in params:
+        kwargs["host"] = host
+    if "transport_security" in params:
+        try:
+            from mcp.server.transport_security import TransportSecuritySettings
+        except ImportError:
+            TransportSecuritySettings = None  # type: ignore[assignment]
+        if TransportSecuritySettings is not None:
+            clean_hosts = [h.strip() for h in allowed_hosts if h and h.strip()]
+            if clean_hosts:
+                kwargs["transport_security"] = TransportSecuritySettings(
+                    enable_dns_rebinding_protection=True,
+                    allowed_hosts=clean_hosts,
+                )
+            else:
+                kwargs["transport_security"] = TransportSecuritySettings(
+                    enable_dns_rebinding_protection=False,
+                )
+    return kwargs
+
+
+def create_mcp_server(
+    get_scheduler: Callable[[], TaskScheduler],
+    host: str = "0.0.0.0",
+    allowed_hosts: Sequence[str] = (),
+) -> FastMCP:
     """Create and configure the FastMCP server with the 3 task management tools."""
-    mcp = FastMCP("dify-scheduler")
+    mcp = FastMCP(
+        "dify-scheduler",
+        **_build_fastmcp_kwargs(host=host, allowed_hosts=allowed_hosts),
+    )
 
     @mcp.tool()
     def create_scheduled_task(

@@ -126,3 +126,4 @@ DIFY_SCHEDULER_INPUTS={"user_id":"$user_id","room_id":"$room_id"}
 | `DATABASE_PATH` | 否 | `./data/bot.db` | SQLite 路径（Docker 中建议 `/app/data/bot.db`） |
 | `PORT` | 否 | `8000` | FastAPI 与 MCP 服务端口 |
 | `MCP_AUTH_TOKEN` | 否 | - | 保护 `/sse` 与 `/messages/` 的可选 Bearer Token |
+| `MCP_ALLOWED_HOSTS` | 否 | - | 可选的 MCP SSE `Host` 白名单（逗号分隔，留空允许所有主机访问） |

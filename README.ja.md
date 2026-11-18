@@ -126,3 +126,4 @@ Dify の MCP 設定で SSE サーバーを追加します：
 | `DATABASE_PATH` | いいえ | `./data/bot.db` | SQLite DB パス（Docker では `/app/data/bot.db`） |
 | `PORT` | いいえ | `8000` | FastAPI および MCP サーバーのポート |
 | `MCP_AUTH_TOKEN` | いいえ | - | `/sse` と `/messages/` を保護する任意の Bearer トークン |
+| `MCP_ALLOWED_HOSTS` | いいえ | - | MCP SSE の任意の `Host` 許可リスト（カンマ区切り、空の場合は全ホストを許可） |

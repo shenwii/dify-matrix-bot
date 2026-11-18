@@ -77,6 +77,7 @@ class Settings:
     port: int
     log_level: str
     mcp_auth_token: str
+    mcp_allowed_hosts: tuple[str, ...] = ()
 
     # Optional Dify inputs templates (JSON objects with $variable placeholders)
     dify_inputs_template: dict[str, Any] = field(default_factory=dict)
@@ -140,6 +141,11 @@ class Settings:
             port=_parse_int(os.getenv("PORT"), 8000, minimum=1),
             log_level=os.getenv("LOG_LEVEL", "INFO").strip().upper() or "INFO",
             mcp_auth_token=os.getenv("MCP_AUTH_TOKEN", "").strip(),
+            mcp_allowed_hosts=tuple(
+                h.strip()
+                for h in os.getenv("MCP_ALLOWED_HOSTS", "").split(",")
+                if h.strip()
+            ),
         )
 
     def validate_runtime(self) -> None:

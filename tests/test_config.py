@@ -41,12 +41,17 @@ class TestSettings(unittest.TestCase):
             "MATRIX_E2EE_ENABLED": "false",
             "MATRIX_STORE_PATH": "/tmp/custom_store",
             "MATRIX_TRUST_ALL_DEVICES": "false",
+            "MCP_ALLOWED_HOSTS": "dify-matrix-bot:8000, 192.168.1.10:8000",
         }
         with patch.dict(os.environ, env, clear=True):
             settings = Settings.from_env()
         self.assertFalse(settings.matrix_e2ee_enabled)
         self.assertEqual(settings.matrix_store_path, "/tmp/custom_store")
         self.assertFalse(settings.matrix_trust_all_devices)
+        self.assertEqual(
+            settings.mcp_allowed_hosts,
+            ("dify-matrix-bot:8000", "192.168.1.10:8000"),
+        )
 
     def test_custom_dify_inputs_json(self) -> None:
         env = {

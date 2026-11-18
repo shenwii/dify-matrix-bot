@@ -213,3 +213,44 @@ def ensure_fastapi_pydantic_stub() -> None:
         fa_resp.HTMLResponse = HTMLResponse
         sys.modules["fastapi"] = fa_mod
         sys.modules["fastapi.responses"] = fa_resp
+
+
+def ensure_mcp_stub() -> None:
+    if not _is_missing("mcp"):
+        return
+    mcp_pkg = types.ModuleType("mcp")
+    mcp_server_pkg = types.ModuleType("mcp.server")
+    fastmcp_mod = types.ModuleType("mcp.server.fastmcp")
+    sec_mod = types.ModuleType("mcp.server.transport_security")
+
+    @dataclass
+    class TransportSecuritySettings:
+        enable_dns_rebinding_protection: bool = True
+        allowed_hosts: list[str] | None = None
+        allowed_origins: list[str] | None = None
+
+    class FastMCP:
+        def __init__(
+            self,
+            name: str,
+            host: str = "127.0.0.1",
+            transport_security: TransportSecuritySettings | None = None,
+        ) -> None:
+            self.name = name
+            self.host = host
+            self.transport_security = transport_security
+            self.tools: dict[str, object] = {}
+
+        def tool(self):
+            def _dec(fn):
+                self.tools[fn.__name__] = fn
+                return fn
+            return _dec
+
+    sec_mod.TransportSecuritySettings = TransportSecuritySettings
+    fastmcp_mod.FastMCP = FastMCP
+
+    sys.modules["mcp"] = mcp_pkg
+    sys.modules["mcp.server"] = mcp_server_pkg
+    sys.modules["mcp.server.fastmcp"] = fastmcp_mod
+    sys.modules["mcp.server.transport_security"] = sec_mod

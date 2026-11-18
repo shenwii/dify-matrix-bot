@@ -51,7 +51,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise RuntimeError("TaskScheduler has not been initialized yet")
         return container.scheduler
 
-    mcp = create_mcp_server(_get_scheduler)
+    mcp = create_mcp_server(
+        _get_scheduler,
+        host=cfg.host,
+        allowed_hosts=cfg.mcp_allowed_hosts,
+    )
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI):

@@ -126,3 +126,4 @@ Add an MCP Server in Dify with:
 | `DATABASE_PATH` | No | `./data/bot.db` | SQLite database file path (`/app/data/bot.db` in Docker) |
 | `PORT` | No | `8000` | FastAPI & MCP server port |
 | `MCP_AUTH_TOKEN` | No | - | Optional Bearer token protecting `/sse` and `/messages/` |
+| `MCP_ALLOWED_HOSTS` | No | - | Optional comma-separated `Host` allowlist for MCP SSE (empty allows all hosts) |
