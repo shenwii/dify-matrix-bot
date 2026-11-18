@@ -23,7 +23,7 @@ class CreateTaskRequest(BaseModel):
 
 
 _DASHBOARD_HTML = """<!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -131,65 +131,65 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
       <div class="status-bar">
         <span id="matrixBadge" class="badge">Matrix: ...</span>
         <span id="tzBadge" class="badge">TZ: ...</span>
-        <button id="refreshBtn" class="secondary" type="button">刷新列表</button>
+        <button id="refreshBtn" class="secondary" type="button">Refresh</button>
       </div>
     </div>
 
     <div class="card">
-      <h2>新增定时任务</h2>
+      <h2>Create Scheduled Task</h2>
       <div id="formMsg" class="msg"></div>
       <form id="createForm" class="grid-form" novalidate>
         <div>
-          <label for="title">标题 *</label>
-          <input id="title" name="title" type="text" placeholder="例如：每日早报" required />
+          <label for="title">Title *</label>
+          <input id="title" name="title" type="text" placeholder="e.g. Daily Digest" required />
         </div>
         <div>
-          <label for="cron">Cron 表达式（5位） *</label>
+          <label for="cron">Cron Expression (5 fields) *</label>
           <input id="cron" name="cron" type="text" placeholder="0 9 * * *" required />
-          <div class="hint">格式：分 时 日 月 周（例如 <code>*/30 * * * *</code>）</div>
+          <div class="hint">Format: min hour day month weekday (e.g. <code>*/30 * * * *</code>)</div>
         </div>
         <div>
-          <label for="room_id">目标 Room ID（可选）</label>
+          <label for="room_id">Target Room ID (optional)</label>
           <input id="room_id" name="room_id" type="text" placeholder="!roomid:example.org" />
-          <div class="hint">为空且填了 User ID 时将私信发送</div>
+          <div class="hint">Leave empty with User ID set to send a DM</div>
         </div>
         <div>
-          <label for="user_id">目标用户 User ID（可选）</label>
+          <label for="user_id">Target User ID (optional)</label>
           <input id="user_id" name="user_id" type="text" placeholder="@alice:example.org" />
-          <div class="hint">与 Room ID 均为空时仅静默执行</div>
+          <div class="hint">Leave both Room ID and User ID empty to run silently</div>
         </div>
         <div class="full">
-          <label for="content">任务内容 *</label>
-          <textarea id="content" name="content" placeholder="到达时间后发给 Dify 执行的指令内容..." required></textarea>
+          <label for="content">Prompt / Content *</label>
+          <textarea id="content" name="content" placeholder="Instructions sent to Dify when the schedule triggers..." required></textarea>
         </div>
         <div class="full actions" style="justify-content: space-between;">
           <label class="checkbox-row" style="margin: 0;">
             <input id="is_one_time" name="is_one_time" type="checkbox" />
-            <span>一次性任务（触发一次后自动删除）</span>
+            <span>One-time task (auto-delete after execution)</span>
           </label>
-          <button id="submitBtn" class="primary" type="submit">创建任务</button>
+          <button id="submitBtn" class="primary" type="submit">Create Task</button>
         </div>
       </form>
     </div>
 
     <div class="card">
-      <h2>当前任务列表（<span id="taskCount">0</span>）</h2>
+      <h2>Scheduled Tasks (<span id="taskCount">0</span>)</h2>
       <div id="listMsg" class="msg"></div>
       <div class="table-wrap">
         <table>
           <thead>
             <tr>
-              <th>标题 / 内容</th>
+              <th>Title / Content</th>
               <th>Cron</th>
-              <th>类型</th>
-              <th>投递目标</th>
-              <th>下次运行 / 统计</th>
+              <th>Type</th>
+              <th>Target</th>
+              <th>Next Run / Stats</th>
               <th>UUID</th>
-              <th>操作</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody id="taskBody">
-            <tr><td colspan="7" class="empty">加载中...</td></tr>
+            <tr><td colspan="7" class="empty">Loading...</td></tr>
           </tbody>
         </table>
       </div>
@@ -233,17 +233,17 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
     }
 
     function validateClient(payload) {
-      if (!payload.title) return "请输入任务标题。";
-      if (!payload.cron) return "请输入 Cron 表达式。";
+      if (!payload.title) return "Please enter a task title.";
+      if (!payload.cron) return "Please enter a cron expression.";
       if (payload.cron.split(/\\s+/).length !== 5) {
-        return "Cron 表达式必须是 5 位（分 时 日 月 周），例如：0 9 * * *";
+        return "Cron expression must have 5 fields (min hour day month weekday), e.g. 0 9 * * *";
       }
-      if (!payload.content) return "请输入任务内容。";
+      if (!payload.content) return "Please enter task content.";
       if (payload.room_id && !/^![^:\\s]+:[^\\s]+$/.test(payload.room_id)) {
-        return "Room ID 格式无效，应类似 !roomid:server（或留空）。";
+        return "Invalid Room ID format; expected !roomid:server (or leave empty).";
       }
       if (payload.user_id && payload.user_id.startsWith("@") && payload.user_id.includes(":") && !/^@[^:\\s]+:[^\\s]+$/.test(payload.user_id)) {
-        return "User ID (MXID) 格式无效，应类似 @user:server。";
+        return "Invalid User ID (MXID) format; expected @user:server.";
       }
       return null;
     }
@@ -264,34 +264,34 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
       try {
         const res = await fetch("/api/tasks");
         const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || "加载失败");
+        if (!res.ok) throw new Error(data.detail || "Failed to load tasks");
         const tasks = data.tasks || [];
         taskCount.textContent = String(tasks.length);
         if (tasks.length === 0) {
-          taskBody.innerHTML = '<tr><td colspan="7" class="empty">暂无定时任务</td></tr>';
+          taskBody.innerHTML = '<tr><td colspan="7" class="empty">No scheduled tasks</td></tr>';
           return;
         }
         taskBody.innerHTML = tasks.map((t) => {
           const target = (!t.room_id && !t.user_id)
-            ? '<span class="hint">静默执行</span>'
+            ? '<span class="hint">Silent</span>'
             : `${t.room_id ? "<div>Room: <code>" + esc(t.room_id) + "</code></div>" : ""}${t.user_id ? "<div>User ID: <code>" + esc(t.user_id) + "</code></div>" : ""}`;
           return `
             <tr>
               <td><strong>${esc(t.title)}</strong><div class="hint" style="white-space:pre-wrap;">${esc(t.content)}</div></td>
               <td><code>${esc(t.cron)}</code></td>
-              <td>${t.is_one_time ? "一次性" : "周期性"}</td>
+              <td>${t.is_one_time ? "One-time" : "Recurring"}</td>
               <td>${target}</td>
               <td>
-                <div>下次: ${esc(formatTime(t.next_run_time))}</div>
-                <div class="hint">已跑 ${esc(t.run_count)} 次${t.last_run_at ? " / 上次: " + esc(formatTime(t.last_run_at)) : ""}</div>
+                <div>Next: ${esc(formatTime(t.next_run_time))}</div>
+                <div class="hint">Runs: ${esc(t.run_count)}${t.last_run_at ? " / Last: " + esc(formatTime(t.last_run_at)) : ""}</div>
               </td>
               <td class="mono">${esc(t.uuid)}</td>
-              <td><button class="danger" type="button" data-delete="${esc(t.uuid)}">删除</button></td>
+              <td><button class="danger" type="button" data-delete="${esc(t.uuid)}">Delete</button></td>
             </tr>
           `;
         }).join("");
       } catch (err) {
-        showMsg(listMsg, "error", "加载任务失败：" + err.message);
+        showMsg(listMsg, "error", "Failed to load tasks: " + err.message);
       }
     }
 
@@ -323,10 +323,10 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
         if (!res.ok) {
           const detail = Array.isArray(data.detail)
             ? data.detail.map((d) => d.msg).join("; ")
-            : (data.detail || "创建失败");
+            : (data.detail || "Failed to create task");
           throw new Error(detail);
         }
-        showMsg(formMsg, "success", "任务已创建：" + data.task.uuid);
+        showMsg(formMsg, "success", "Task created: " + data.task.uuid);
         createForm.reset();
         await loadTasks();
       } catch (err) {
@@ -340,16 +340,16 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
       const btn = e.target.closest("button[data-delete]");
       if (!btn) return;
       const uuid = btn.getAttribute("data-delete");
-      if (!confirm("确认删除定时任务 " + uuid + " ？")) return;
+      if (!confirm("Delete scheduled task " + uuid + "?")) return;
       btn.disabled = true;
       clearMsg(listMsg);
       try {
         const res = await fetch("/api/tasks/" + encodeURIComponent(uuid), { method: "DELETE" });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || "删除失败");
+        if (!res.ok) throw new Error(data.detail || "Failed to delete task");
         await loadTasks();
       } catch (err) {
-        showMsg(listMsg, "error", "删除失败：" + err.message);
+        showMsg(listMsg, "error", "Failed to delete task: " + err.message);
         btn.disabled = false;
       }
     });

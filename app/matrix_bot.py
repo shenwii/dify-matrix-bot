@@ -305,7 +305,6 @@ class MatrixBot:
             self._client.access_token = self._settings.matrix_access_token
             self._client.user_id = self._settings.matrix_user_id
             self._client.device_id = self._settings.matrix_device_id
-            self._client.logged_in = True
             whoami = await self._client.whoami()
             if getattr(whoami, "user_id", None):
                 self._client.user_id = whoami.user_id
@@ -329,7 +328,6 @@ class MatrixBot:
             self._client.access_token = saved.access_token
             self._client.user_id = saved.user_id
             self._client.device_id = saved.device_id
-            self._client.logged_in = True
             whoami = await self._client.whoami()
             if getattr(whoami, "user_id", None):
                 self._load_crypto_store_if_enabled()
@@ -344,7 +342,6 @@ class MatrixBot:
                 self._settings.matrix_homeserver, self._settings.matrix_user_id
             )
             self._client.access_token = ""
-            self._client.logged_in = False
 
         resp = await self._client.login(
             password=self._settings.matrix_password,

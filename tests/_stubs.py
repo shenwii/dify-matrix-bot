@@ -43,9 +43,14 @@ def ensure_nio_stub() -> None:
             self.homeserver = homeserver
             self.user_id = user
             self.device_id = device_id
+            self.access_token = ""
             self.store_path = store_path
             self.config = config
             self.rooms = {}
+
+        @property
+        def logged_in(self) -> bool:
+            return bool(self.user_id and self.device_id and self.access_token)
 
     class _DummyRoomPreset:
         private_chat = "private_chat"

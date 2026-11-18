@@ -16,6 +16,7 @@ ensure_nio_stub()
 from app.config import Settings
 from app.database import Database, RoomMessageRecord
 from app.matrix_bot import (
+    LoginResponse,
     MatrixBot,
     build_matrix_message_content,
     format_room_history,
@@ -258,6 +259,112 @@ class TestMatrixBotHelpers(unittest.TestCase):
             bot._client.verify_device = lambda dev: verified_calls.append(dev)
             bot._trust_devices(["@alice:example.org"])
             self.assertEqual(verified_calls, [fake_device])
+        db.close()
+
+    def test_authenticate_access_token_and_session_restore(self) -> None:
+        class _DummyLoginResp(LoginResponse):
+            def __init__(self, user_id: str, device_id: str, access_token: str) -> None:
+                self.user_id = user_id
+                self.device_id = device_id
+                self.access_token = access_token
+
+        db = Database(":memory:")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # 1. Access token authentication (must not assign read-only AsyncClient.logged_in)
+            token_settings = Settings(
+                matrix_homeserver="https://matrix.example.org",
+                matrix_user_id="@bot:example.org",
+                matrix_access_token="tok_env",
+                matrix_password="",
+                matrix_device_id="DIFY_MATRIX_BOT",
+                matrix_auto_join=True,
+                matrix_group_context_limit=10,
+                matrix_command_prefix="",
+                matrix_typing_interval_seconds=15,
+                matrix_typing_timeout_ms=30000,
+                dify_base_url="https://api.dify.ai/v1",
+                dify_api_key="key",
+                dify_timeout_seconds=60.0,
+                dify_scheduled_user="scheduler",
+                timezone="Asia/Shanghai",
+                database_path=":memory:",
+                host="0.0.0.0",
+                port=8000,
+                log_level="INFO",
+                mcp_auth_token="",
+                matrix_e2ee_enabled=True,
+                matrix_store_path=tmpdir,
+                matrix_trust_all_devices=True,
+            )
+            bot = MatrixBot(settings=token_settings, db=db, dify_client=object())  # type: ignore[arg-type]
+            load_calls: list[str] = []
+
+            async def _fake_whoami():
+                return types.SimpleNamespace(
+                    user_id="@bot:example.org",
+                    device_id="REAL_DEV_1",
+                )
+
+            bot._client.whoami = _fake_whoami  # type: ignore[attr-defined]
+            bot._client.load_store = lambda: load_calls.append("loaded")  # type: ignore[attr-defined]
+
+            asyncio.run(bot._authenticate())
+            self.assertTrue(bot._client.logged_in)
+            self.assertEqual(bot._client.device_id, "REAL_DEV_1")
+            self.assertEqual(load_calls, ["loaded"])
+
+            # 2. Expired saved session falls back to password login and saves new session
+            db.save_bot_session(
+                homeserver="https://matrix.example.org",
+                user_id="@bot:example.org",
+                device_id="OLD_DEV",
+                access_token="expired_tok",
+            )
+            pw_settings = Settings(
+                matrix_homeserver="https://matrix.example.org",
+                matrix_user_id="@bot:example.org",
+                matrix_access_token="",
+                matrix_password="secret",
+                matrix_device_id="DIFY_MATRIX_BOT",
+                matrix_auto_join=True,
+                matrix_group_context_limit=10,
+                matrix_command_prefix="",
+                matrix_typing_interval_seconds=15,
+                matrix_typing_timeout_ms=30000,
+                dify_base_url="https://api.dify.ai/v1",
+                dify_api_key="key",
+                dify_timeout_seconds=60.0,
+                dify_scheduled_user="scheduler",
+                timezone="Asia/Shanghai",
+                database_path=":memory:",
+                host="0.0.0.0",
+                port=8000,
+                log_level="INFO",
+                mcp_auth_token="",
+                matrix_e2ee_enabled=True,
+                matrix_store_path=tmpdir,
+                matrix_trust_all_devices=True,
+            )
+            bot2 = MatrixBot(settings=pw_settings, db=db, dify_client=object())  # type: ignore[arg-type]
+
+            async def _expired_whoami():
+                return types.SimpleNamespace(message="Unknown token")
+
+            async def _fake_login(password: str, device_name: str):
+                bot2._client.access_token = "fresh_tok"
+                bot2._client.user_id = "@bot:example.org"
+                bot2._client.device_id = "NEW_DEV"
+                return _DummyLoginResp("@bot:example.org", "NEW_DEV", "fresh_tok")
+
+            bot2._client.whoami = _expired_whoami  # type: ignore[attr-defined]
+            bot2._client.login = _fake_login  # type: ignore[attr-defined]
+
+            asyncio.run(bot2._authenticate())
+            self.assertTrue(bot2._client.logged_in)
+            saved = db.get_bot_session("https://matrix.example.org", "@bot:example.org")
+            self.assertIsNotNone(saved)
+            self.assertEqual(saved.access_token, "fresh_tok")
+            self.assertEqual(saved.device_id, "NEW_DEV")
         db.close()
 
 
