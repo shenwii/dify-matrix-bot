@@ -1,0 +1,11 @@
+services:
+  dify-matrix-bot:
+    build: .
+    container_name: dify-matrix-bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "${PORT:-8000}:8000"
+    volumes:
+      - ./data:/app/data

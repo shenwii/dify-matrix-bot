@@ -1,0 +1,18 @@
+[project]
+name = "dify-matrix-bot"
+version = "0.1.0"
+description = "Matrix bot and Dify scheduled task MCP server powered by matrix-nio and FastAPI"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115.0,<1.0.0",
+    "uvicorn[standard]>=0.32.0,<1.0.0",
+    "matrix-nio[e2e]>=0.26.0,<1.0.0",
+    "mcp>=1.2.0,<2.0.0",
+    "apscheduler>=3.10.4,<4.0.0",
+    "httpx>=0.27.2,<1.0.0",
+    "markdown>=3.7,<4.0.0",
+    "tzdata>=2024.1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
