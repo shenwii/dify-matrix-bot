@@ -114,7 +114,8 @@ def extract_localpart(user_id: str) -> str:
     return user_id.lstrip("@")
 
 
-MATRIX_ROOM_ID_RE = re.compile(r"^![^:\s]+:[^\s]+$")
+# Supports both legacy Matrix room IDs (!opaque:server) and Room v12 / MSC4291 IDs (!opaque)
+MATRIX_ROOM_ID_RE = re.compile(r"^![^:\s]+(?::[^\s]+)?$")
 MATRIX_MXID_RE = re.compile(r"^@[^:\s]+:[^\s]+$")
 
 _TARGET_PLACEHOLDERS = {
@@ -157,7 +158,7 @@ def validate_target_format(room_id: str, user_id: str) -> tuple[str, str]:
 
     if clean_room and not MATRIX_ROOM_ID_RE.match(clean_room):
         raise ValueError(
-            f"Invalid room_id {clean_room!r}: expected Matrix room ID like '!room:server' or empty string."
+            f"Invalid room_id {clean_room!r}: expected Matrix room ID like '!room:server' or '!roomhash' (v12), or empty string."
         )
 
     if clean_user:

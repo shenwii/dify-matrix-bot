@@ -239,8 +239,8 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
         return "Cron expression must have 5 fields (min hour day month weekday), e.g. 0 9 * * *";
       }
       if (!payload.content) return "Please enter task content.";
-      if (payload.room_id && !/^![^:\\s]+:[^\\s]+$/.test(payload.room_id)) {
-        return "Invalid Room ID format; expected !roomid:server (or leave empty).";
+      if (payload.room_id && !/^![^:\\s]+(?::[^\\s]+)?$/.test(payload.room_id)) {
+        return "Invalid Room ID format; expected !roomid:server or !roomhash (or leave empty).";
       }
       if (payload.user_id && payload.user_id.startsWith("@") && payload.user_id.includes(":") && !/^@[^:\\s]+:[^\\s]+$/.test(payload.user_id)) {
         return "Invalid User ID (MXID) format; expected @user:server.";

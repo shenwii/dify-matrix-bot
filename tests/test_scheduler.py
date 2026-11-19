@@ -145,6 +145,18 @@ class TestTaskScheduler(unittest.TestCase):
         self.assertEqual(created["user_id"], "")
         self.assertEqual(created["room_id"], "")
 
+        # Room v12 (MSC4291) room_id without :server suffix is accepted
+        v12_task = self.scheduler.create_task(
+            title="V12 Room Task",
+            cron="0 8 * * *",
+            content="Check v12 room",
+            room_id="!0EgO6JUj4upTN5XF70_Ox0Wg0gFVD8WKJxIdFGiYL_4",
+        )
+        self.assertEqual(
+            v12_task["room_id"],
+            "!0EgO6JUj4upTN5XF70_Ox0Wg0gFVD8WKJxIdFGiYL_4",
+        )
+
         # Hallucinated room_id format is rejected at creation time
         with self.assertRaises(ValueError):
             self.scheduler.create_task(
@@ -152,6 +164,13 @@ class TestTaskScheduler(unittest.TestCase):
                 cron="0 8 * * *",
                 content="Check status",
                 room_id="general_chat",
+            )
+        with self.assertRaises(ValueError):
+            self.scheduler.create_task(
+                title="Trailing Colon Room",
+                cron="0 8 * * *",
+                content="Check status",
+                room_id="!room:",
             )
 
         # Malformed MXID with whitespace is rejected at creation time
